@@ -1,0 +1,5 @@
+token: 'YOURTOKEN'
+
+bot:
+  plugins:
+    - plugins.mcreminderplugin
