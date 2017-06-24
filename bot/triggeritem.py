@@ -41,13 +41,15 @@ class TriggerItem(object):
 			atts = [(self.reminder.attachments[i], self.reminder.attachmentsData[i]) for i in range(len(self.reminder.attachments))]
 		m = self.reminder.content
 		m = m.replace(u'$AUTHOR', u'<@' + str(event.author.id) + '>')
-		for index, t in enumerate(self.replacementTokens[satisfiedPatternIndex]):
-			m = m.replace("$" + str(index+1), t)
-		return m, e, atts
+		# chech if we have tokens to substitute for this satisfied pattern
+		if satisfiedPatternIndex < len(self.replacementTokens):
+			for index, t in enumerate(self.replacementTokens[satisfiedPatternIndex]):
+				m = m.replace("$" + str(index+1), t)
+		return (m, e, atts)
 
 	def satisfiesTrigger(self, event):
 		text = event.content.lower()
 		for index, p in enumerate(self.patterns):
 			if p.search(text) and self.isCooldownSatisfied(event):
 				return self.craftReply(event, index)
-		return None
+		return (None, None, [])

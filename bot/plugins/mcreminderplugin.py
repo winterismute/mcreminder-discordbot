@@ -19,7 +19,7 @@ def newjsondecode(data):
 		return toTriggerItemReminder(data)
 	raise ValueError('Error: can not parse data: ' + str(data))
 
-class McReminderPlugin(Plugin):
+class SimplePlugin(Plugin):
 
 	def load(self, ctx):
 		try:
@@ -45,5 +45,5 @@ class McReminderPlugin(Plugin):
 			return
 		for trigger in self.triggers:
 			craftedMessage, craftedEmbed, craftedAttachments = trigger.satisfiesTrigger(event)
-			if craftedMessage:
+			if not craftedMessage is None:
 				event.reply(craftedMessage, attachments=craftedAttachments, embed=craftedEmbed)
