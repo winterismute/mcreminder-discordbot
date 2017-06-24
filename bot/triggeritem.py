@@ -9,23 +9,21 @@ class TriggerItemReminder(object):
 		self.attachmentsData = [open(apath, 'rb') for apath in self.attachments]
 
 class TriggerItem(object):
-	def __init__(self, itemType, tokens, reminder, replacementTokens=None, cooldownTime=0):
+	def __init__(self, itemType, tokens, reminder, replacementTokens=None, cooldownTime=0, logger=None):
 		self.itemType = itemType
 		self.patterns = []
 		if itemType == 'regex':
 			self.patterns = [re.compile(t) for t in tokens]
 		self.reminder = reminder
 		self.replacementTokens = replacementTokens
-		self.cooldownTime = cooldownTime
+		self.cooldownTime = int(cooldownTime)
 		self.cooldowns = {}
+		self.logger = logger
 
 	def isCooldownSatisfied(self, e):
 		if self.cooldownTime <= 0:
 			return True
-		if not e.channel_id in self.cooldowns:
-			self.cooldowns[e.channel_id] = e.timestamp
-			return True
-		if (e.timestamp - self.cooldowns[e.channel_id]).total_seconds() > self.cooldownTime:
+		if not e.channel_id in self.cooldowns or ((e.timestamp - self.cooldowns[e.channel_id]).total_seconds() > self.cooldownTime):
 			self.cooldowns[e.channel_id] = e.timestamp
 			return True
 		# update cooldown even if we are below the threshold
@@ -55,3 +53,6 @@ class TriggerItem(object):
 			if p.search(text) and self.isCooldownSatisfied(event):
 				return self.craftReply(event, index)
 		return (None, None, [])
+
+	def attachLogger(self, logger):
+		self.logger = logger

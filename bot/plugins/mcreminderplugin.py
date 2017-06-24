@@ -8,7 +8,7 @@ def toTriggerItemReminder(dct):
 	return TriggerItemReminder(dct['content'], dct.get('embed', None), dct.get('attachments', []))
 
 def toTriggerItem(dct):
-	return TriggerItem(dct['type'], dct['tokens'], (dct['reminder']), dct.get('replacementTokens',[]), dct.get('cooldownTime', 0))
+	return TriggerItem(dct['type'], dct['tokens'], (dct['reminder']), dct.get('replacementTokens',[]), dct.get('cooldowntime', 0))
 
 def newjsondecode(data):
 	if 'triggers' in data:
@@ -34,6 +34,8 @@ class SimplePlugin(Plugin):
 					#self.triggers = json.load(json_data, object_hook = newjsondecode, encoding="cp1252")
 					self.triggers = json.load(json_data, object_hook = newjsondecode)
 					self.log.info(self.triggers)
+					for t in self.triggers:
+						t.attachLogger(self.log)
 				except ValueError as e:
 					self.log.error('Can not process struture of botconfig.json: ' + str(e))
 					sys.exit()
