@@ -28,6 +28,8 @@ class TriggerItem(object):
 		if (e.timestamp - self.cooldowns[e.channel_id]).total_seconds() > self.cooldownTime:
 			self.cooldowns[e.channel_id] = e.timestamp
 			return True
+		# update cooldown even if we are below the threshold
+		self.cooldowns[e.channel_id] = e.timestamp
 		return False
 
 	def craftReply(self, event, satisfiedPatternIndex):
