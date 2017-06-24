@@ -1,0 +1,16 @@
+{
+	"triggers": [{
+			"type": "regex",
+			"tokens": ["dota", "overwatch"],
+			"reminder": {
+				"content": "Hey $AUTHOR! Thinking about playig a game of $1? Consider asking for people to join on the forums first.",
+				"embed": "http://www.xonotic.org/m/uploads/2011/11/duel.png"
+			},
+			"replacementTokens": [
+				["DotA"],
+				["Overwatch"]
+			],
+			"cooldowntime": "60"
+		}
+	]
+}
