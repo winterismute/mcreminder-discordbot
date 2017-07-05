@@ -3,8 +3,9 @@ Discord bot written in python and [disco](https://github.com/b1naryth1ef/disco/)
 Developed for the Discord channel of [gameloop.it](https://gameloop.it/), the Italian gamedev community.
 
 # Installation
-Have python3+ installed. Install disco
+Have python3+ installed. Install nltk and disco
 ```bash
+python -m pip install nltk
 python -m pip install disco-py
 ```
 disco can be installed with some additional dependencies, check out [their instructions](https://github.com/b1naryth1ef/disco)

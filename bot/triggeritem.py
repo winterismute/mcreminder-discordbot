@@ -1,5 +1,6 @@
 from disco.types.message import MessageEmbed
 import re
+import string
 
 class TriggerItemReminder(object):
 	def __init__(self, content, embed=None, attachments=[]):
@@ -17,8 +18,15 @@ class TriggerItem(object):
 	def __init__(self, itemType, tokens, reminder, replacementTokens=None, cds=[], logger=None):
 		self.itemType = itemType
 		self.patterns = []
+		self.stemmer = None
+		self.translatorPunctuation = None
 		if itemType == 'regex':
 			self.patterns = [re.compile(t) for t in tokens]
+		elif itemType == 'equals_word_stem':
+			from nltk.stem import SnowballStemmer
+			self.stemmer = SnowballStemmer("italian")
+			self.translatorPunctuation = str.maketrans('', '', string.punctuation)
+			self.patterns = tokens
 		self.reminder = reminder
 		self.replacementTokens = replacementTokens
 		self.timeCooldowns = []
@@ -83,9 +91,19 @@ class TriggerItem(object):
 
 	def satisfiesTrigger(self, event):
 		text = event.content.lower()
-		for index, p in enumerate(self.patterns):
-			if p.search(text) and self.areCooldownsSatisfied(event):
-				return self.craftReply(event, index)
+		if self.areCooldownsSatisfied(event):
+			if self.itemType == 'equals_word_stem' and any(p in text for p in self.patterns):
+				# check if it is real match
+				words = text.translate(self.translatorPunctuation).split()
+				for w in words:
+					stemmed = self.stemmer.stem(w)
+					for index, p in enumerate(self.patterns):
+						if p == stemmed:
+							return self.craftReply(event, index)
+			elif self.itemType == 'regex':
+				for index, p in enumerate(self.patterns):
+					if p.search(text):
+						return self.craftReply(event, index)
 		return (None, None, [])
 
 	def attachLogger(self, logger):
