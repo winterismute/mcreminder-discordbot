@@ -55,7 +55,7 @@ class TriggerItem(object):
 		for c in self.msgIntervalCooldowns:
 			if not e.channel_id in self.cooldownMsgCounterPerChannel:
 				self.cooldownMsgCounterPerChannel[e.channel_id] = c.cooldownParam
-				satisfied = satisfied & True
+				satisfied = satisfied and True
 			elif self.cooldownMsgCounterPerChannel[e.channel_id] <= 0:
 				satisfied = satisfied and True
 			else:
