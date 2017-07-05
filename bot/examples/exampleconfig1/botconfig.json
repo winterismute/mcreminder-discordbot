@@ -1,6 +1,6 @@
 {
 	"triggers": [{
-			"type": "regex",
+			"type": "equals_word_stem",
 			"tokens": ["dota", "overwatch"],
 			"reminder": {
 				"content": "Hey $AUTHOR! Thinking about playig a game of $1? Consider asking for people to join on the forums first.",
@@ -10,7 +10,16 @@
 				["DotA"],
 				["Overwatch"]
 			],
-			"cooldowntime": "60"
+			"cooldowns": [
+				{
+					"cooldown_type" : "msg_interval",
+					"cooldown_value" : 5
+				},
+				{
+					"cooldown_type" : "seconds",
+					"cooldown_value" : 120
+				}
+			]
 		}
 	]
 }
