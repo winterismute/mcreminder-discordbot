@@ -8,27 +8,61 @@ class TriggerItemReminder(object):
 		self.attachments = attachments
 		self.attachmentsData = [open(apath, 'rb') for apath in self.attachments]
 
+class TriggerItemCooldown(object):
+	def __init__(self, cooldowntype, cooldownparam):
+		self.cooldownType = cooldowntype
+		self.cooldownParam = cooldownparam
+
 class TriggerItem(object):
-	def __init__(self, itemType, tokens, reminder, replacementTokens=None, cooldownTime=0, logger=None):
+	def __init__(self, itemType, tokens, reminder, replacementTokens=None, cds=[], logger=None):
 		self.itemType = itemType
 		self.patterns = []
 		if itemType == 'regex':
 			self.patterns = [re.compile(t) for t in tokens]
 		self.reminder = reminder
 		self.replacementTokens = replacementTokens
-		self.cooldownTime = int(cooldownTime)
-		self.cooldowns = {}
+		self.timeCooldowns = []
+		self.msgIntervalCooldowns = []
+		for ci in cds:
+			if ci.cooldownType == 'seconds':
+				self.timeCooldowns.append(ci)
+			elif ci.cooldownType == 'msg_interval':
+				self.msgIntervalCooldowns.append(ci)
+		self.cooldownTSPerChannel = {}
+		self.cooldownMsgCounterPerChannel = {}
 		self.logger = logger
 
-	def isCooldownSatisfied(self, e):
-		if self.cooldownTime <= 0:
-			return True
-		if not e.channel_id in self.cooldowns or ((e.timestamp - self.cooldowns[e.channel_id]).total_seconds() > self.cooldownTime):
-			self.cooldowns[e.channel_id] = e.timestamp
-			return True
-		# update cooldown even if we are below the threshold
-		self.cooldowns[e.channel_id] = e.timestamp
-		return False
+	def areCooldownsSatisfied(self, e):
+		satisfied = True
+		for c in self.timeCooldowns:
+			if c.cooldownParam <= 0:
+				satisfied = satisfied and True
+			elif (not e.channel_id in self.cooldownTSPerChannel or ((e.timestamp - self.cooldownTSPerChannel[e.channel_id]).total_seconds() > c.cooldownParam)):
+				self.cooldownTSPerChannel[e.channel_id] = e.timestamp
+				satisfied = satisfied and True
+			else:
+				# update time cooldown even if we are below the threshold
+				self.cooldownTSPerChannel[e.channel_id] = e.timestamp
+				satisfied = satisfied and False
+		for c in self.msgIntervalCooldowns:
+			if not e.channel_id in self.cooldownMsgCounterPerChannel:
+				self.cooldownMsgCounterPerChannel[e.channel_id] = c.cooldownParam
+				satisfied = satisfied & True
+			elif self.cooldownMsgCounterPerChannel[e.channel_id] <= 0:
+				print(c)
+				satisfied = satisfied and True
+			else:
+				satisfied = satisfied and False
+		if satisfied:
+			# reset the countdown for msg interval only if we have satisfied everything
+			for c in self.msgIntervalCooldowns:
+				self.cooldownMsgCounterPerChannel[e.channel_id] = c.cooldownParam
+		return satisfied
+
+	def updateOnMsg(self, e):
+		for cid, val in self.cooldownMsgCounterPerChannel.items():
+			if val > 0:
+				self.cooldownMsgCounterPerChannel[cid] -= 1
 
 	def craftReply(self, event, satisfiedPatternIndex):
 		e = None
@@ -50,7 +84,7 @@ class TriggerItem(object):
 	def satisfiesTrigger(self, event):
 		text = event.content.lower()
 		for index, p in enumerate(self.patterns):
-			if p.search(text) and self.isCooldownSatisfied(event):
+			if p.search(text) and self.areCooldownsSatisfied(event):
 				return self.craftReply(event, index)
 		return (None, None, [])
 

@@ -1,5 +1,5 @@
 from disco.bot import Bot, Plugin
-from triggeritem import TriggerItem, TriggerItemReminder
+from triggeritem import TriggerItem, TriggerItemReminder, TriggerItemCooldown
 import re
 import json
 import sys
@@ -7,8 +7,11 @@ import sys
 def toTriggerItemReminder(dct):
 	return TriggerItemReminder(dct['content'], dct.get('embed', None), dct.get('attachments', []))
 
+def toTriggerItemCooldown(dct):
+	return TriggerItemCooldown(dct['cooldown_type'], dct['cooldown_value'])
+
 def toTriggerItem(dct):
-	return TriggerItem(dct['type'], dct['tokens'], (dct['reminder']), dct.get('replacementTokens',[]), dct.get('cooldowntime', 0))
+	return TriggerItem(dct['type'], dct['tokens'], (dct['reminder']), dct.get('replacementTokens',[]), dct.get('cooldowns', []))
 
 def newjsondecode(data):
 	if 'triggers' in data:
@@ -17,6 +20,8 @@ def newjsondecode(data):
 		return toTriggerItem(data)
 	if 'content' in data:
 		return toTriggerItemReminder(data)
+	if 'cooldown_type' in data:
+		return toTriggerItemCooldown(data)
 	raise ValueError('Error: can not parse data: ' + str(data))
 
 class SimplePlugin(Plugin):
@@ -46,6 +51,7 @@ class SimplePlugin(Plugin):
 		if (event.author.id == self.state.me.id):
 			return
 		for trigger in self.triggers:
+			trigger.updateOnMsg(event)
 			craftedMessage, craftedEmbed, craftedAttachments = trigger.satisfiesTrigger(event)
 			if not craftedMessage is None:
 				event.reply(craftedMessage, attachments=craftedAttachments, embed=craftedEmbed)
