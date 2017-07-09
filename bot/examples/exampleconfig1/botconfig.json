@@ -1,6 +1,7 @@
 {
 	"triggers": [{
 			"type": "equals_word_stem",
+			"lang" : "english",
 			"tokens": ["dota", "overwatch"],
 			"reminder": {
 				"content": "Hey $AUTHOR! Thinking about playig a game of $1? Consider asking for people to join on the forums first.",
