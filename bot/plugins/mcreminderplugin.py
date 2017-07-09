@@ -1,17 +1,20 @@
 from disco.bot import Bot, Plugin
 from triggeritem import TriggerItem, TriggerItemReminder, TriggerItemCooldown
-import re
 import json
 import sys
+
 
 def toTriggerItemReminder(dct):
 	return TriggerItemReminder(dct['content'], dct.get('embed', None), dct.get('attachments', []))
 
+
 def toTriggerItemCooldown(dct):
 	return TriggerItemCooldown(dct['cooldown_type'], dct['cooldown_value'])
 
+
 def toTriggerItem(dct):
-	return TriggerItem(dct['type'], dct['tokens'], (dct['reminder']), dct.get('replacementTokens',[]), dct.get('cooldowns', []))
+	return TriggerItem(dct['type'], dct['tokens'], (dct['reminder']), dct.get('replacementTokens', []), dct.get('cooldowns', []))
+
 
 def newjsondecode(data):
 	if 'triggers' in data:
@@ -23,6 +26,7 @@ def newjsondecode(data):
 	if 'cooldown_type' in data:
 		return toTriggerItemCooldown(data)
 	raise ValueError('Error: can not parse data: ' + str(data))
+
 
 class SimplePlugin(Plugin):
 
@@ -37,7 +41,7 @@ class SimplePlugin(Plugin):
 			with json_data:
 				try:
 					#self.triggers = json.load(json_data, object_hook = newjsondecode, encoding="cp1252")
-					self.triggers = json.load(json_data, object_hook = newjsondecode)
+					self.triggers = json.load(json_data, object_hook=newjsondecode)
 					self.log.info(self.triggers)
 					for t in self.triggers:
 						t.attachLogger(self.log)
@@ -53,5 +57,5 @@ class SimplePlugin(Plugin):
 		for trigger in self.triggers:
 			trigger.updateOnMsg(event)
 			craftedMessage, craftedEmbed, craftedAttachments = trigger.satisfiesTrigger(event)
-			if not craftedMessage is None:
+			if craftedMessage is not None:
 				event.reply(craftedMessage, attachments=craftedAttachments, embed=craftedEmbed)

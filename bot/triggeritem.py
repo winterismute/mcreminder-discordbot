@@ -2,6 +2,7 @@ from disco.types.message import MessageEmbed
 import re
 import string
 
+
 class TriggerItemReminder(object):
 	def __init__(self, content, embed=None, attachments=[]):
 		self.content = content
@@ -9,10 +10,12 @@ class TriggerItemReminder(object):
 		self.attachments = attachments
 		self.attachmentsData = [open(apath, 'rb') for apath in self.attachments]
 
+
 class TriggerItemCooldown(object):
 	def __init__(self, cooldowntype, cooldownparam):
 		self.cooldownType = cooldowntype
 		self.cooldownParam = cooldownparam
+
 
 class TriggerItem(object):
 	def __init__(self, itemType, tokens, reminder, replacementTokens=None, cds=[], logger=None):
@@ -43,9 +46,7 @@ class TriggerItem(object):
 	def areCooldownsSatisfied(self, e):
 		satisfied = True
 		for c in self.timeCooldowns:
-			if c.cooldownParam <= 0:
-				satisfied = satisfied and True
-			elif (not e.channel_id in self.cooldownTSPerChannel or ((e.timestamp - self.cooldownTSPerChannel[e.channel_id]).total_seconds() > c.cooldownParam)):
+			if (e.channel_id not in self.cooldownTSPerChannel or ((e.timestamp - self.cooldownTSPerChannel[e.channel_id]).total_seconds() >= c.cooldownParam)):
 				self.cooldownTSPerChannel[e.channel_id] = e.timestamp
 				satisfied = satisfied and True
 			else:
@@ -53,7 +54,7 @@ class TriggerItem(object):
 				self.cooldownTSPerChannel[e.channel_id] = e.timestamp
 				satisfied = satisfied and False
 		for c in self.msgIntervalCooldowns:
-			if not e.channel_id in self.cooldownMsgCounterPerChannel:
+			if e.channel_id not in self.cooldownMsgCounterPerChannel:
 				self.cooldownMsgCounterPerChannel[e.channel_id] = c.cooldownParam
 				satisfied = satisfied and True
 			elif self.cooldownMsgCounterPerChannel[e.channel_id] <= 0:
@@ -61,20 +62,19 @@ class TriggerItem(object):
 			else:
 				satisfied = satisfied and False
 		if satisfied:
-			# reset the countdown for msg interval only if we have satisfied everything
+			# reset the countdown for msg interval only if all cooldowns were satisfied
 			for c in self.msgIntervalCooldowns:
 				self.cooldownMsgCounterPerChannel[e.channel_id] = c.cooldownParam
 		return satisfied
 
 	def updateOnMsg(self, e):
-		for cid, val in self.cooldownMsgCounterPerChannel.items():
-			if val > 0:
-				self.cooldownMsgCounterPerChannel[cid] -= 1
+		if e.channel_id in self.cooldownMsgCounterPerChannel and self.cooldownMsgCounterPerChannel[e.channel_id] > 0:
+			self.cooldownMsgCounterPerChannel[e.channel_id] -= 1
 
 	def craftReply(self, event, satisfiedPatternIndex):
 		e = None
 		# here, we check for None since empty string means "suppress embeds"
-		if not self.reminder.embed is None:
+		if self.reminder.embed is not None:
 			e = MessageEmbed()
 			e.set_image(url=self.reminder.embed)
 		atts = []
@@ -85,25 +85,31 @@ class TriggerItem(object):
 		# chech if we have tokens to substitute for this satisfied pattern
 		if satisfiedPatternIndex < len(self.replacementTokens):
 			for index, t in enumerate(self.replacementTokens[satisfiedPatternIndex]):
-				m = m.replace("$" + str(index+1), t)
+				m = m.replace("$" + str(index + 1), t)
 		return (m, e, atts)
 
 	def satisfiesTrigger(self, event):
 		text = event.content.lower()
-		if self.areCooldownsSatisfied(event):
-			if self.itemType == 'equals_word_stem' and any(p in text for p in self.patterns):
-				# check if it is real match
-				words = text.translate(self.translatorPunctuation).split()
-				for w in words:
-					stemmed = self.stemmer.stem(w)
-					for index, p in enumerate(self.patterns):
-						if p == stemmed:
-							return self.craftReply(event, index)
-			elif self.itemType == 'regex':
+		if self.itemType == 'equals_word_stem' and any(p in text for p in self.patterns):
+			words = text.translate(self.translatorPunctuation).split()
+			for w in words:
 				for index, p in enumerate(self.patterns):
-					if p.search(text):
-						return self.craftReply(event, index)
+					if p in w:  # preliminary match: pattern is in word
+						# check if it matches also with the stem
+						stemmed = self.stemmer.stem(w)
+						if (p == stemmed) and (stemmed != w) and (self.areCooldownsSatisfied(event)):  # we exclude words that were already stems, they are usually false positives
+							return self.craftReply(event, index)
+		elif self.itemType == 'regex':
+			for index, p in enumerate(self.patterns):
+				if p.search(text) and self.areCooldownsSatisfied(event):
+					return self.craftReply(event, index)
 		return (None, None, [])
 
 	def attachLogger(self, logger):
 		self.logger = logger
+
+	def logMessage(self, msg):
+		if self.logger:
+			self.logger.info(msg)
+		else:
+			print(msg)
