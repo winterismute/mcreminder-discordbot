@@ -3,12 +3,16 @@ Discord bot written in python and [disco](https://github.com/b1naryth1ef/disco/)
 Developed for the Discord channel of [gameloop.it](https://gameloop.it/), the Italian gamedev community.
 
 # Installation
-Have python3+ installed. Install nltk and disco
+Have python3+ installed. Install disco:
 ```bash
-python -m pip install nltk
 python -m pip install disco-py
 ```
 disco can be installed with some additional dependencies, check out [their instructions](https://github.com/b1naryth1ef/disco)
+
+If you want to use some advanced features, such as word stems matching, you will also need nltk:
+```bash
+python -m pip install nltk
+```
 
 # Deployment
 See doc/HOWTODEPLOY.
