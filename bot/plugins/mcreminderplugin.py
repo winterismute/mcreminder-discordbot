@@ -13,7 +13,7 @@ def toTriggerItemCooldown(dct):
 
 
 def toTriggerItem(dct):
-	return TriggerItem(dct['type'], dct['tokens'], (dct['reminder']), dct.get('replacementTokens', []), dct.get('cooldowns', []))
+	return TriggerItem(dct['type'], dct['tokens'], (dct['reminder']), dct.get('replacementTokens', []), dct.get('cooldowns', []), dct.get('lang', None))
 
 
 def newjsondecode(data):

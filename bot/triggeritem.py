@@ -18,7 +18,7 @@ class TriggerItemCooldown(object):
 
 
 class TriggerItem(object):
-	def __init__(self, itemType, tokens, reminder, replacementTokens=None, cds=[], logger=None):
+	def __init__(self, itemType, tokens, reminder, replacementTokens=None, cds=[], lang=None, logger=None):
 		self.itemType = itemType
 		self.patterns = []
 		self.stemmer = None
@@ -27,7 +27,9 @@ class TriggerItem(object):
 			self.patterns = [re.compile(t) for t in tokens]
 		elif itemType == 'equals_word_stem':
 			from nltk.stem import SnowballStemmer
-			self.stemmer = SnowballStemmer("italian")
+			self.language = lang
+			# if not self.language:
+			self.stemmer = SnowballStemmer(self.language)
 			self.translatorPunctuation = str.maketrans('', '', string.punctuation)
 			self.patterns = tokens
 		self.reminder = reminder
@@ -42,6 +44,19 @@ class TriggerItem(object):
 		self.cooldownTSPerChannel = {}
 		self.cooldownMsgCounterPerChannel = {}
 		self.logger = logger
+
+	def ensureLanguage(self, text):
+		if not self.language:
+			self.logMessage('WARNING: can not ensure language if current language is not set')
+			return False
+		else:
+			from polyglot.detect import Detector
+			detector = Detector(text)
+			if detector.languages:
+				#for l in detector.languages:
+				#	self.logMessage(l.name)
+				return self.language == detector.languages[0].name.lower()
+			return False
 
 	def areCooldownsSatisfied(self, e):
 		satisfied = True
@@ -90,7 +105,7 @@ class TriggerItem(object):
 
 	def satisfiesTrigger(self, event):
 		text = event.content.lower()
-		if self.itemType == 'equals_word_stem' and any(p in text for p in self.patterns):
+		if self.itemType == 'equals_word_stem' and self.ensureLanguage(text) and any(p in text for p in self.patterns):
 			words = text.translate(self.translatorPunctuation).split()
 			for w in words:
 				for index, p in enumerate(self.patterns):

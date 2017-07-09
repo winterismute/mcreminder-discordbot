@@ -9,10 +9,12 @@ python -m pip install disco-py
 ```
 disco can be installed with some additional dependencies, check out [their instructions](https://github.com/b1naryth1ef/disco)
 
-If you want to use some advanced features, such as word stems matching, you will also need nltk:
+If you want to use some advanced features, such as word stems matching, you will also need nltk and polyglot:
 ```bash
 python -m pip install nltk
+python -m pip install polyglot
 ```
+Be aware that polyglot has some additional dependencies, please refer to its own [installation instructions](http://polyglot.readthedocs.io/en/latest/Installation.html)
 
 # Deployment
 See doc/HOWTODEPLOY.
