@@ -53,7 +53,7 @@ class TriggerItem(object):
 			from polyglot.detect import Detector
 			detector = Detector(text)
 			if detector.languages:
-				#for l in detector.languages:
+				# for l in detector.languages:
 				#	self.logMessage(l.name)
 				return self.language == detector.languages[0].name.lower()
 			return False

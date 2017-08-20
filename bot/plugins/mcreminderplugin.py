@@ -40,7 +40,7 @@ class SimplePlugin(Plugin):
 		else:
 			with json_data:
 				try:
-					#self.triggers = json.load(json_data, object_hook = newjsondecode, encoding="cp1252")
+					# self.triggers = json.load(json_data, object_hook = newjsondecode, encoding="cp1252")
 					self.triggers = json.load(json_data, object_hook=newjsondecode)
 					self.log.info(self.triggers)
 					for t in self.triggers:
