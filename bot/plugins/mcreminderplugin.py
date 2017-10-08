@@ -1,5 +1,5 @@
 from disco.bot import Bot, Plugin
-from triggeritem import TriggerItem, TriggerItemReminder, TriggerItemCooldown
+from triggeritem import TriggerItemReminder, TriggerItemRegex, TriggerItemEqualStems, TriggerCooldownTimeInterval, TriggerCooldownMsgInterval
 import json
 import sys
 
@@ -9,11 +9,21 @@ def toTriggerItemReminder(dct):
 
 
 def toTriggerItemCooldown(dct):
-	return TriggerItemCooldown(dct['cooldown_type'], dct['cooldown_value'])
+	cdType = dct['cooldown_type']
+	if cdType == 'seconds':
+		return TriggerCooldownTimeInterval(dct['cooldown_value'])
+	elif cdType == 'msg_interval':
+		return TriggerCooldownMsgInterval(dct['cooldown_value'])
+	raise ValueError('Error: can not parse cooldown item with type: ' + str(cdType))
 
 
 def toTriggerItem(dct):
-	return TriggerItem(dct['type'], dct['tokens'], (dct['reminder']), dct.get('replacementTokens', []), dct.get('cooldowns', []), dct.get('lang', None))
+	itemType = dct.get('type')
+	if itemType == 'regex':
+		return TriggerItemRegex(dct['tokens'], (dct['reminder']), dct.get('replacementTokens', []), dct.get('cooldowns', []))
+	elif itemType == 'equals_word_stem':
+		return TriggerItemEqualStems(dct['tokens'], (dct['reminder']), dct.get('lang', None), dct.get('replacementTokens', []), dct.get('cooldowns', []))
+	raise ValueError('Error: can not parse trigger item with type: ' + str(itemType))
 
 
 def newjsondecode(data):
@@ -40,7 +50,7 @@ class SimplePlugin(Plugin):
 		else:
 			with json_data:
 				try:
-					# self.triggers = json.load(json_data, object_hook = newjsondecode, encoding="cp1252")
+# 					self.triggers = json.load(json_data, object_hook = newjsondecode, encoding="cp1252")
 					self.triggers = json.load(json_data, object_hook=newjsondecode)
 					self.log.info(self.triggers)
 					for t in self.triggers:
@@ -55,7 +65,7 @@ class SimplePlugin(Plugin):
 		if (event.author.id == self.state.me.id):
 			return
 		for trigger in self.triggers:
-			trigger.updateOnMsg(event)
-			craftedMessage, craftedEmbed, craftedAttachments = trigger.satisfiesTrigger(event)
+			trigger.onMessageUpdate(event)
+			craftedMessage, craftedEmbed, craftedAttachments = trigger.satisfies(event)
 			if craftedMessage is not None:
 				event.reply(craftedMessage, attachments=craftedAttachments, embed=craftedEmbed)

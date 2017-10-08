@@ -1,6 +1,8 @@
 from disco.types.message import MessageEmbed
 import re
 import string
+from abc import ABC, abstractmethod
+from itertools import chain
 
 
 class TriggerItemReminder(object):
@@ -11,80 +13,92 @@ class TriggerItemReminder(object):
 		self.attachmentsData = [open(apath, 'rb') for apath in self.attachments]
 
 
-class TriggerItemCooldown(object):
-	def __init__(self, cooldowntype, cooldownparam):
-		self.cooldownType = cooldowntype
-		self.cooldownParam = cooldownparam
+class TriggerCooldown(ABC):
+	@abstractmethod
+	def isSatisfied(self, event):
+		pass
 
 
-class TriggerItem(object):
-	def __init__(self, itemType, tokens, reminder, replacementTokens=None, cds=[], lang=None, logger=None):
-		self.itemType = itemType
-		self.patterns = []
-		self.stemmer = None
-		self.translatorPunctuation = None
-		if itemType == 'regex':
-			self.patterns = [re.compile(t) for t in tokens]
-		elif itemType == 'equals_word_stem':
-			from nltk.stem import SnowballStemmer
-			self.language = lang
-			# if not self.language:
-			self.stemmer = SnowballStemmer(self.language)
-			self.translatorPunctuation = str.maketrans('', '', string.punctuation)
-			self.patterns = tokens
+class TriggerCooldownTimeInterval(TriggerCooldown):
+	def __init__(self, secs):
+		self.seconds = secs
+		self.timeStampPerChannel = {}
+
+	def isSatisfied(self, event):
+		if (event.channel_id not in self.timeStampPerChannel or ((event.timestamp - self.timeStampPerChannel[event.channel_id]).total_seconds() >= self.seconds)):
+			self.timeStampPerChannel[event.channel_id] = event.timestamp
+			return True
+		else:
+			# update time cooldown even if we are below the threshold
+			self.timeStampPerChannel[event.channel_id] = event.timestamp
+			return False
+
+
+class TriggerCooldownMsgInterval(TriggerCooldown):
+	def __init__(self, interval):
+		self.msgInterval = interval
+		self.msgCounterPerChannel = {}
+
+	def isSatisfied(self, event):
+		if event.channel_id not in self.msgCounterPerChannel:
+			self.msgCounterPerChannel[event.channel_id] = self.msgInterval
+			return True
+		elif self.msgCounterPerChannel[event.channel_id] <= 0:
+			return True
+		else:
+			return False
+
+	def resetInterval(self, channel_id):
+		self.msgCounterPerChannel[channel_id] = self.msgInterval
+
+	def onMessageUpdate(self, event):
+		if event.channel_id in self.msgCounterPerChannel and self.msgCounterPerChannel[event.channel_id] > 0:
+			self.msgCounterPerChannel[event.channel_id] -= 1
+
+
+class TriggerItemBase(object):
+	def __init__(self, tokens, reminder, replacementTokens=None, cds=[], logger=None):
+		self.patterns = tokens
 		self.reminder = reminder
 		self.replacementTokens = replacementTokens
-		self.timeCooldowns = []
-		self.msgIntervalCooldowns = []
-		for ci in cds:
-			if ci.cooldownType == 'seconds':
-				self.timeCooldowns.append(ci)
-			elif ci.cooldownType == 'msg_interval':
-				self.msgIntervalCooldowns.append(ci)
-		self.cooldownTSPerChannel = {}
-		self.cooldownMsgCounterPerChannel = {}
+		self.cooldownsMsgInterval = []
+		self.cooldownsTimeInterval = []
+		for c in cds:
+			if isinstance(c, TriggerCooldownTimeInterval):
+				self.cooldownsTimeInterval.append(c)
+			elif isinstance(c, TriggerCooldownMsgInterval):
+				self.cooldownsMsgInterval.append(c)
 		self.logger = logger
 
-	def ensureLanguage(self, text):
-		if not self.language:
-			self.logMessage('WARNING: can not ensure language if current language is not set')
-			return False
+	def attachLogger(self, logger):
+		self.logger = logger
+
+	def logMessage(self, msg):
+		if self.logger:
+			self.logger.info(msg)
 		else:
-			from polyglot.detect import Detector
-			detector = Detector(text)
-			if detector.languages:
-				# for l in detector.languages:
-				#	self.logMessage(l.name)
-				return self.language == detector.languages[0].name.lower()
-			return False
+			print(msg)
+
+	def onMessageUpdate(self, e):
+		for c in self.cooldownsMsgInterval:
+			c.onMessageUpdate(e)
 
 	def areCooldownsSatisfied(self, e):
-		satisfied = True
-		for c in self.timeCooldowns:
-			if (e.channel_id not in self.cooldownTSPerChannel or ((e.timestamp - self.cooldownTSPerChannel[e.channel_id]).total_seconds() >= c.cooldownParam)):
-				self.cooldownTSPerChannel[e.channel_id] = e.timestamp
-				satisfied = satisfied and True
-			else:
-				# update time cooldown even if we are below the threshold
-				self.cooldownTSPerChannel[e.channel_id] = e.timestamp
-				satisfied = satisfied and False
-		for c in self.msgIntervalCooldowns:
-			if e.channel_id not in self.cooldownMsgCounterPerChannel:
-				self.cooldownMsgCounterPerChannel[e.channel_id] = c.cooldownParam
-				satisfied = satisfied and True
-			elif self.cooldownMsgCounterPerChannel[e.channel_id] <= 0:
-				satisfied = satisfied and True
-			else:
-				satisfied = satisfied and False
-		if satisfied:
-			# reset the countdown for msg interval only if all cooldowns were satisfied
-			for c in self.msgIntervalCooldowns:
-				self.cooldownMsgCounterPerChannel[e.channel_id] = c.cooldownParam
-		return satisfied
-
-	def updateOnMsg(self, e):
-		if e.channel_id in self.cooldownMsgCounterPerChannel and self.cooldownMsgCounterPerChannel[e.channel_id] > 0:
-			self.cooldownMsgCounterPerChannel[e.channel_id] -= 1
+		'''
+		for c in self.cooldownsMsgInterval:
+			if not c.isSatisfied(e):
+				return False
+		for c in self.cooldownsTimeInterval:
+			if not c.isSatisfied(e):
+				return False
+		'''
+		for c in chain(self.cooldownsMsgInterval, self.cooldownsTimeInterval):
+			if not c.isSatisfied(e):
+				return False
+		# Here all cooldowns are satisfied
+		for c in self.cooldownsMsgInterval:
+			c.resetInterval(e.channel_id)
+		return True
 
 	def craftReply(self, event, satisfiedPatternIndex):
 		e = None
@@ -103,9 +117,47 @@ class TriggerItem(object):
 				m = m.replace("$" + str(index + 1), t)
 		return (m, e, atts)
 
-	def satisfiesTrigger(self, event):
+	def satisfies(self, event):
+		pass
+
+
+class TriggerItemRegex(TriggerItemBase):
+	def __init__(self, tokens, reminder, replacementTokens=None, cds=[], logger=None):
+		TriggerItemBase.__init__(self, tokens, reminder, replacementTokens, cds, logger)
+		self.patterns = [re.compile(t) for t in tokens]
+
+	def satisfies(self, event):
 		text = event.content.lower()
-		if self.itemType == 'equals_word_stem' and self.ensureLanguage(text) and any(p in text for p in self.patterns):
+		for index, p in enumerate(self.patterns):
+			if p.search(text) and self.areCooldownsSatisfied(event):
+				return self.craftReply(event, index)
+		return (None, None, [])
+
+
+class TriggerItemEqualStems(TriggerItemBase):
+	def __init__(self, tokens, reminder, lang=None, replacementTokens=None, cds=[], logger=None):
+		TriggerItemBase.__init__(self, tokens, reminder, replacementTokens, cds, logger)
+		from nltk.stem import SnowballStemmer
+		self.language = "english" if not lang else lang
+		self.stemmer = SnowballStemmer(self.language)
+		self.translatorPunctuation = str.maketrans('', '', string.punctuation)
+		self.patterns = tokens
+
+	def ensureLanguage(self, text):
+		if not self.language:
+			self.logMessage('WARNING: can not ensure language if current language is not set')
+			return False
+		else:
+			from polyglot.detect import Detector
+			detector = Detector(text)
+			if detector.languages:
+				# for l in detector.languages:
+				#	self.logMessage(l.name)
+				return self.language == detector.languages[0].name.lower()
+
+	def satisfies(self, event):
+		text = event.content.lower()
+		if self.ensureLanguage(text) and any(p in text for p in self.patterns):
 			words = text.translate(self.translatorPunctuation).split()
 			for w in words:
 				for index, p in enumerate(self.patterns):
@@ -114,17 +166,4 @@ class TriggerItem(object):
 						stemmed = self.stemmer.stem(w)
 						if (p == stemmed) and (stemmed != w) and (self.areCooldownsSatisfied(event)):  # we exclude words that were already stems, they are usually false positives
 							return self.craftReply(event, index)
-		elif self.itemType == 'regex':
-			for index, p in enumerate(self.patterns):
-				if p.search(text) and self.areCooldownsSatisfied(event):
-					return self.craftReply(event, index)
 		return (None, None, [])
-
-	def attachLogger(self, logger):
-		self.logger = logger
-
-	def logMessage(self, msg):
-		if self.logger:
-			self.logger.info(msg)
-		else:
-			print(msg)
