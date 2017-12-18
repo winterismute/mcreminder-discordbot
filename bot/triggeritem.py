@@ -3,6 +3,7 @@ import re
 import string
 from abc import ABC, abstractmethod
 from itertools import chain
+import gevent
 
 
 class TriggerItemReminder(object):
@@ -55,6 +56,19 @@ class TriggerCooldownMsgInterval(TriggerCooldown):
 		if event.channel_id in self.msgCounterPerChannel and self.msgCounterPerChannel[event.channel_id] > 0:
 			self.msgCounterPerChannel[event.channel_id] -= 1
 
+class TriggerCooldownMsgDuration(TriggerCooldown):
+	def __init__(self, duration):
+		self.msgDuration = duration
+
+	def isSatisfied(self, event):
+		return True
+
+	def delete_message_task(self, msg):
+		gevent.sleep(self.msgDuration)
+		msg.delete()
+
+	def onReply(self, msg):
+		gevent.spawn(self.delete_message_task, msg)
 
 class TriggerItemBase(object):
 	def __init__(self, tokens, reminder, replacementTokens=None, cds=[], logger=None):
@@ -63,11 +77,14 @@ class TriggerItemBase(object):
 		self.replacementTokens = replacementTokens
 		self.cooldownsMsgInterval = []
 		self.cooldownsTimeInterval = []
+		self.cooldownsMsgDuration = []
 		for c in cds:
 			if isinstance(c, TriggerCooldownTimeInterval):
 				self.cooldownsTimeInterval.append(c)
 			elif isinstance(c, TriggerCooldownMsgInterval):
 				self.cooldownsMsgInterval.append(c)
+			elif isinstance(c, TriggerCooldownMsgDuration):
+				self.cooldownsMsgDuration.append(c)
 		self.logger = logger
 
 	def attachLogger(self, logger):
@@ -83,6 +100,10 @@ class TriggerItemBase(object):
 		for c in self.cooldownsMsgInterval:
 			c.onMessageUpdate(e)
 
+	def onReply(self, msg):
+		for c in self.cooldownsMsgDuration:
+			c.onReply(msg)
+
 	def areCooldownsSatisfied(self, e):
 		'''
 		for c in self.cooldownsMsgInterval:
@@ -92,7 +113,7 @@ class TriggerItemBase(object):
 			if not c.isSatisfied(e):
 				return False
 		'''
-		for c in chain(self.cooldownsMsgInterval, self.cooldownsTimeInterval):
+		for c in chain(self.cooldownsMsgInterval, self.cooldownsTimeInterval, self.cooldownsMsgDuration):
 			if not c.isSatisfied(e):
 				return False
 		# Here all cooldowns are satisfied

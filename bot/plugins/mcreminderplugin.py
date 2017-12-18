@@ -1,5 +1,5 @@
 from disco.bot import Bot, Plugin
-from triggeritem import TriggerItemReminder, TriggerItemRegex, TriggerItemEqualStems, TriggerCooldownTimeInterval, TriggerCooldownMsgInterval
+from triggeritem import TriggerItemReminder, TriggerItemRegex, TriggerItemEqualStems, TriggerCooldownTimeInterval, TriggerCooldownMsgInterval, TriggerCooldownMsgDuration
 import json
 import sys
 
@@ -14,6 +14,8 @@ def toTriggerItemCooldown(dct):
 		return TriggerCooldownTimeInterval(dct['cooldown_value'])
 	elif cdType == 'msg_interval':
 		return TriggerCooldownMsgInterval(dct['cooldown_value'])
+	elif cdType == 'msg_duration':
+		return TriggerCooldownMsgDuration(dct['cooldown_value'])
 	raise ValueError('Error: can not parse cooldown item with type: ' + str(cdType))
 
 
@@ -68,4 +70,5 @@ class SimplePlugin(Plugin):
 			trigger.onMessageUpdate(event)
 			craftedMessage, craftedEmbed, craftedAttachments = trigger.satisfies(event)
 			if craftedMessage is not None:
-				event.reply(craftedMessage, attachments=craftedAttachments, embed=craftedEmbed)
+				msg = event.reply(craftedMessage, attachments=craftedAttachments, embed=craftedEmbed)
+				trigger.onReply(msg)
