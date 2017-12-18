@@ -19,6 +19,12 @@ class TriggerCooldown(ABC):
 	def isSatisfied(self, event):
 		pass
 
+	def onReply(self, event, msg):
+		pass
+
+	def onMessageUpdate(self, event):
+		pass
+
 
 class TriggerCooldownTimeInterval(TriggerCooldown):
 	def __init__(self, secs):
@@ -26,13 +32,10 @@ class TriggerCooldownTimeInterval(TriggerCooldown):
 		self.timeStampPerChannel = {}
 
 	def isSatisfied(self, event):
-		if (event.channel_id not in self.timeStampPerChannel or ((event.timestamp - self.timeStampPerChannel[event.channel_id]).total_seconds() >= self.seconds)):
-			self.timeStampPerChannel[event.channel_id] = event.timestamp
-			return True
-		else:
-			# update time cooldown even if we are below the threshold
-			self.timeStampPerChannel[event.channel_id] = event.timestamp
-			return False
+		return event.channel_id not in self.timeStampPerChannel or ((event.timestamp - self.timeStampPerChannel[event.channel_id]).total_seconds() >= self.seconds)
+
+	def onReply(self, event, msg):
+		self.timeStampPerChannel[event.channel_id] = event.timestamp
 
 
 class TriggerCooldownMsgInterval(TriggerCooldown):
@@ -49,42 +52,20 @@ class TriggerCooldownMsgInterval(TriggerCooldown):
 		else:
 			return False
 
-	def resetInterval(self, channel_id):
-		self.msgCounterPerChannel[channel_id] = self.msgInterval
+	def onReply(self, event, msg):
+		self.msgCounterPerChannel[event.channel_id] = self.msgInterval
 
 	def onMessageUpdate(self, event):
 		if event.channel_id in self.msgCounterPerChannel and self.msgCounterPerChannel[event.channel_id] > 0:
 			self.msgCounterPerChannel[event.channel_id] -= 1
 
-class TriggerCooldownMsgDuration(TriggerCooldown):
-	def __init__(self, duration):
-		self.msgDuration = duration
-
-	def isSatisfied(self, event):
-		return True
-
-	def delete_message_task(self, msg):
-		gevent.sleep(self.msgDuration)
-		msg.delete()
-
-	def onReply(self, msg):
-		gevent.spawn(self.delete_message_task, msg)
-
 class TriggerItemBase(object):
-	def __init__(self, tokens, reminder, replacementTokens=None, cds=[], logger=None):
+	def __init__(self, tokens, reminder, replacementTokens=None, cds=[], messageDuration=None, logger=None):
 		self.patterns = tokens
 		self.reminder = reminder
 		self.replacementTokens = replacementTokens
-		self.cooldownsMsgInterval = []
-		self.cooldownsTimeInterval = []
-		self.cooldownsMsgDuration = []
-		for c in cds:
-			if isinstance(c, TriggerCooldownTimeInterval):
-				self.cooldownsTimeInterval.append(c)
-			elif isinstance(c, TriggerCooldownMsgInterval):
-				self.cooldownsMsgInterval.append(c)
-			elif isinstance(c, TriggerCooldownMsgDuration):
-				self.cooldownsMsgDuration.append(c)
+		self.cooldowns = cds
+		self.messageDuration = messageDuration
 		self.logger = logger
 
 	def attachLogger(self, logger):
@@ -97,28 +78,24 @@ class TriggerItemBase(object):
 			print(msg)
 
 	def onMessageUpdate(self, e):
-		for c in self.cooldownsMsgInterval:
+		for c in self.cooldowns:
 			c.onMessageUpdate(e)
 
-	def onReply(self, msg):
-		for c in self.cooldownsMsgDuration:
-			c.onReply(msg)
+	def delete_message_task(self, msg):
+		gevent.sleep(self.messageDuration)
+		msg.delete()
+
+	def onReply(self, event, msg):
+		for c in self.cooldowns:
+			c.onReply(event, msg)
+		if self.messageDuration != None:
+			gevent.spawn(self.delete_message_task, msg)
 
 	def areCooldownsSatisfied(self, e):
-		'''
-		for c in self.cooldownsMsgInterval:
-			if not c.isSatisfied(e):
-				return False
-		for c in self.cooldownsTimeInterval:
-			if not c.isSatisfied(e):
-				return False
-		'''
-		for c in chain(self.cooldownsMsgInterval, self.cooldownsTimeInterval, self.cooldownsMsgDuration):
+		for c in self.cooldowns:
 			if not c.isSatisfied(e):
 				return False
 		# Here all cooldowns are satisfied
-		for c in self.cooldownsMsgInterval:
-			c.resetInterval(e.channel_id)
 		return True
 
 	def craftReply(self, event, satisfiedPatternIndex):
@@ -143,8 +120,8 @@ class TriggerItemBase(object):
 
 
 class TriggerItemRegex(TriggerItemBase):
-	def __init__(self, tokens, reminder, replacementTokens=None, cds=[], logger=None):
-		TriggerItemBase.__init__(self, tokens, reminder, replacementTokens, cds, logger)
+	def __init__(self, tokens, reminder, replacementTokens=None, cds=[], messageDuration=None, logger=None):
+		TriggerItemBase.__init__(self, tokens, reminder, replacementTokens, cds, messageDuration, logger)
 		self.patterns = [re.compile(t) for t in tokens]
 
 	def satisfies(self, event):
@@ -156,8 +133,8 @@ class TriggerItemRegex(TriggerItemBase):
 
 
 class TriggerItemEqualStems(TriggerItemBase):
-	def __init__(self, tokens, reminder, lang=None, replacementTokens=None, cds=[], logger=None):
-		TriggerItemBase.__init__(self, tokens, reminder, replacementTokens, cds, logger)
+	def __init__(self, tokens, reminder, lang=None, replacementTokens=None, cds=[], messageDuration=None, logger=None):
+		TriggerItemBase.__init__(self, tokens, reminder, replacementTokens, cds, messageDuration, logger)
 		from nltk.stem import SnowballStemmer
 		self.language = "english" if not lang else lang
 		self.stemmer = SnowballStemmer(self.language)

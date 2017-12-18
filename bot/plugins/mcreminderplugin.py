@@ -1,5 +1,5 @@
 from disco.bot import Bot, Plugin
-from triggeritem import TriggerItemReminder, TriggerItemRegex, TriggerItemEqualStems, TriggerCooldownTimeInterval, TriggerCooldownMsgInterval, TriggerCooldownMsgDuration
+from triggeritem import TriggerItemReminder, TriggerItemRegex, TriggerItemEqualStems, TriggerCooldownTimeInterval, TriggerCooldownMsgInterval
 import json
 import sys
 
@@ -14,17 +14,15 @@ def toTriggerItemCooldown(dct):
 		return TriggerCooldownTimeInterval(dct['cooldown_value'])
 	elif cdType == 'msg_interval':
 		return TriggerCooldownMsgInterval(dct['cooldown_value'])
-	elif cdType == 'msg_duration':
-		return TriggerCooldownMsgDuration(dct['cooldown_value'])
 	raise ValueError('Error: can not parse cooldown item with type: ' + str(cdType))
 
 
 def toTriggerItem(dct):
 	itemType = dct.get('type')
 	if itemType == 'regex':
-		return TriggerItemRegex(dct['tokens'], (dct['reminder']), dct.get('replacementTokens', []), dct.get('cooldowns', []))
+		return TriggerItemRegex(dct['tokens'], (dct['reminder']), dct.get('replacementTokens', []), dct.get('cooldowns', []), dct.get('messageDuration', None))
 	elif itemType == 'equals_word_stem':
-		return TriggerItemEqualStems(dct['tokens'], (dct['reminder']), dct.get('lang', None), dct.get('replacementTokens', []), dct.get('cooldowns', []))
+		return TriggerItemEqualStems(dct['tokens'], (dct['reminder']), dct.get('lang', None), dct.get('replacementTokens', []), dct.get('cooldowns', []), dct.get('messageDuration', None))
 	raise ValueError('Error: can not parse trigger item with type: ' + str(itemType))
 
 
@@ -71,4 +69,4 @@ class SimplePlugin(Plugin):
 			craftedMessage, craftedEmbed, craftedAttachments = trigger.satisfies(event)
 			if craftedMessage is not None:
 				msg = event.reply(craftedMessage, attachments=craftedAttachments, embed=craftedEmbed)
-				trigger.onReply(msg)
+				trigger.onReply(event, msg)
