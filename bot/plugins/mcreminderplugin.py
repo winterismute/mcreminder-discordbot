@@ -20,9 +20,9 @@ def toTriggerItemCooldown(dct):
 def toTriggerItem(dct):
 	itemType = dct.get('type')
 	if itemType == 'regex':
-		return TriggerItemRegex(dct['tokens'], (dct['reminder']), dct.get('replacementTokens', []), dct.get('cooldowns', []))
+		return TriggerItemRegex(dct['tokens'], (dct['reminder']), dct.get('replacementTokens', []), dct.get('cooldowns', []), dct.get('messageDuration', None))
 	elif itemType == 'equals_word_stem':
-		return TriggerItemEqualStems(dct['tokens'], (dct['reminder']), dct.get('lang', None), dct.get('replacementTokens', []), dct.get('cooldowns', []))
+		return TriggerItemEqualStems(dct['tokens'], (dct['reminder']), dct.get('lang', None), dct.get('replacementTokens', []), dct.get('cooldowns', []), dct.get('messageDuration', None))
 	raise ValueError('Error: can not parse trigger item with type: ' + str(itemType))
 
 
@@ -68,4 +68,5 @@ class SimplePlugin(Plugin):
 			trigger.onMessageUpdate(event)
 			craftedMessage, craftedEmbed, craftedAttachments = trigger.satisfies(event)
 			if craftedMessage is not None:
-				event.reply(craftedMessage, attachments=craftedAttachments, embed=craftedEmbed)
+				msg = event.reply(craftedMessage, attachments=craftedAttachments, embed=craftedEmbed)
+				trigger.onReply(event, msg)
