@@ -11,6 +11,7 @@
 				["DotA"],
 				["Overwatch"]
 			],
+			"messageDuration" : 120,
 			"cooldowns": [
 				{
 					"cooldown_type" : "msg_interval",

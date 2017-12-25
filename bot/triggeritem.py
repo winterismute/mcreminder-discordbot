@@ -2,7 +2,6 @@ from disco.types.message import MessageEmbed
 import re
 import string
 from abc import ABC, abstractmethod
-from itertools import chain
 import gevent
 
 
@@ -88,7 +87,7 @@ class TriggerItemBase(object):
 	def onReply(self, event, msg):
 		for c in self.cooldowns:
 			c.onReply(event, msg)
-		if self.messageDuration != None:
+		if self.messageDuration is not None:
 			gevent.spawn(self.delete_message_task, msg)
 
 	def areCooldownsSatisfied(self, e):
