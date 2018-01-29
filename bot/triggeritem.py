@@ -148,7 +148,8 @@ class TriggerItemEqualStems(TriggerItemBase):
 			self.logMessage('WARNING: can not ensure language if current language is not set')
 			return False
 		else:
-			from polyglot.detect import Detector, UnknownLanguage
+			from polyglot.detect import Detector
+			from polyglot.detect.base import UnknownLanguage
 			try:
 				detector = Detector(text)
 				if detector.languages:
