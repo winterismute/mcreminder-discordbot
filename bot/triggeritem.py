@@ -1,4 +1,5 @@
 from disco.types.message import MessageEmbed
+from disco.api.http import APIException
 import re
 import string
 from abc import ABC, abstractmethod
@@ -81,14 +82,16 @@ class TriggerItemBase(object):
 			c.onMessageUpdate(e)
 
 	def delete_message_task(self, msg):
-		gevent.sleep(self.messageDuration)
-		msg.delete()
+		try:
+			msg.delete()
+		except APIException:
+			self.logMessage("FAILED deletion of message from gevent")
 
 	def onReply(self, event, msg):
 		for c in self.cooldowns:
 			c.onReply(event, msg)
 		if self.messageDuration is not None:
-			gevent.spawn(self.delete_message_task, msg)
+			gevent.spawn_later(self.messageDuration, self.delete_message_task, msg)
 
 	def areCooldownsSatisfied(self, e):
 		for c in self.cooldowns:
